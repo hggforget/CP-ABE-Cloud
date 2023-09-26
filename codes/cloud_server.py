@@ -1,9 +1,6 @@
-import json
-
 from ECC import curve, Point
 from hashlib import sha256
 import socketio
-import eventlet
 from aiohttp import web
 from abe_utils import verify2
 
@@ -95,7 +92,7 @@ def user_init(sid, data):
 
 
 @sio.event
-async def send(sid, data):
+async def send(data):
     if data['to'] in sids:
         await sio.emit('message',
                        {'from': data['from'], 'c0': data['c0'], 'c1': data['c1'], 'c2': data['c2'], 'p': data['p']},
@@ -103,7 +100,7 @@ async def send(sid, data):
 
 
 @sio.event
-async def save(sid, data):
+async def save(data):
     message = unpack(data)
     msgs.append(message)
     print(msgs)
@@ -125,7 +122,6 @@ async def fetch(sid, data):
 @sio.event
 async def decrypt(sid, data):
     name = data['name']
-    c1 = data['c1']
     c2 = data['c2']
     p = data['p']
     sk = users[name]
