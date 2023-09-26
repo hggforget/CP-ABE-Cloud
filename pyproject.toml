@@ -13,6 +13,8 @@ nummaster = "^0.1.1"
 requests = "^2.31.0"
 websocket-client = "^1.6.3"
 eventlet = "^0.33.3"
+pycryptodome = "^3.19.0"
+crypto = "^1.4.1"
 
 
 [build-system]

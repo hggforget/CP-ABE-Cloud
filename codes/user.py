@@ -3,6 +3,7 @@ import time
 import socketio
 from ECC import curve, Point
 from abe_utils import *
+from des_utils import *
 
 serverSocket = socketio.Client()
 serverSocket.connect('http://127.0.0.1:10001')
@@ -35,16 +36,18 @@ def parser_conditions(access_condition):
 
 @serverSocket.event
 def encrypt(data):
+    encrypt_key = data['key']
     public_keys = data['pk']
     access_condition = data['condition']
     msg = data['msg']
+    cipher = SymEncrypt.get_des_encrypt(msg, encrypt_key.encode(), mode="CBC", iv=b"01234567")
     A, p = parser_conditions(access_condition)
     pk = []
     for attr in p:
         key = public_keys[attr_list.index(attr)]
         pk.append(Point(key, curve))
 
-    M = msg_tp_point(msg)
+    M = msg_tp_point(encrypt_key)
     s = curve.generatePrivateKey()
     c0 = M + s * curve.G
     l = len(A[0])
@@ -64,7 +67,7 @@ def encrypt(data):
     for lam, om, _p in zip(lamb, ome, pk):
         c1.append((lam * curve.G + om * _p).compress())
         c2.append((om * curve.G).compress())
-    return c0, c1, c2, p
+    return c0, c1, c2, p, cipher
 
 
 @serverSocket.event
@@ -74,9 +77,10 @@ def message(data):
     c2 = data['c2']
     c1 = data['c1']
     c0 = data['c0']
+    cipher = data['cipher']
     res = verify1(c1, c2, p, attr_index)
     if res:
-        serverSocket.emit('decrypt', {'name': name, 'c0': c0, 'c1': res[0], 'c2': res[1], 'p': res[2],
+        serverSocket.emit('decrypt', {'name': name, 'c0': c0, 'c1': res[0], 'c2': res[1], 'p': res[2], 'cipher': cipher,
                                       'from': data['from']})
     else:
         decrypt_fail(data)
@@ -88,6 +92,7 @@ def decrypt(data):
     c0 = data['c0']
     c1 = data['c1']
     res = data['res']
+    cipher = data['cipher']
     res_point = Point(res, curve)
     for _c1 in c1:
         c1_point = Point(_c1, curve)
@@ -95,7 +100,9 @@ def decrypt(data):
     sg = sum_c1 - res_point
     c0_point = Point(c0, curve)
     m = c0_point - sg
-    print("\nMsg from " + data['from'] + ' ' + point_to_msg(m) + '\n')
+    key = point_to_msg(m)
+    msg = SymEncrypt.get_des_decrypt(cipher, key=key.encode(), mode="CBC", iv=b"01234567")
+    print("\nMsg from " + data['from'] + ' ' + msg.decode() + '\n')
 
 
 @serverSocket.event
@@ -114,12 +121,13 @@ def handle_pk(data):
 def save_msg():
     access_condition = input("Type condition(and, or): ")
     msg = input("msg: ")
+    key = input("key: ")
     serverSocket.emit('get_pk')
     time.sleep(1)
     global pk
-    data = {'pk': pk, 'condition': access_condition, 'msg': msg}
-    c0, c1, c2, p = encrypt(data)
-    serverSocket.emit('save', {'from': name, 'c0': c0.compress(), 'c1': c1, 'c2': c2, 'p': p})
+    data = {'pk': pk, 'condition': access_condition, 'msg': msg, 'key': key}
+    c0, c1, c2, p, cipher = encrypt(data)
+    serverSocket.emit('save', {'from': name, 'c0': c0.compress(), 'c1': c1, 'c2': c2, 'p': p, 'cipher': cipher})
 
 
 def fetch_msg():

@@ -25,15 +25,17 @@ class Attribute:
 
 
 class Message:
-    def __init__(self, name, c0, c1, c2, p):
+    def __init__(self, name, c0, c1, c2, p, cipher):
         self.name = name
         self.c0 = c0
         self.c1 = c1
         self.c2 = c2
         self.p = p
+        self.cipher = cipher
 
     def __repr__(self):
-        return str({'c0': self.c0, 'c1': self.c1, 'c2': self.c2, 'p': self.p}) + f" from {self.name}\n"
+        return str(
+            {'c0': self.c0, 'c1': self.c1, 'c2': self.c2, 'p': self.p, 'cipher': self.cipher}) + f" from {self.name}\n"
 
 
 key = Key()
@@ -53,7 +55,8 @@ def unpack(data):
     c1 = data['c1']
     c2 = data['c2']
     p = data['p']
-    return Message(name, c0, c1, c2, p)
+    cipher = data['cipher']
+    return Message(name, c0, c1, c2, p, cipher)
 
 
 def setup():
@@ -113,7 +116,8 @@ async def fetch(sid, data):
     for msg in msgs:
         if verify2(msg.c2, msg.p, attr_index):
             await sio.emit('message',
-                           {'from': msg.name, 'c0': msg.c0, 'c1': msg.c1, 'c2': msg.c2, 'p': msg.p},
+                           {'from': msg.name, 'c0': msg.c0, 'c1': msg.c1, 'c2': msg.c2, 'p': msg.p,
+                            'cipher': msg.cipher},
                            room=sid)
             print(f"fetch message success:\n {msg}\n")
 
@@ -131,7 +135,8 @@ async def decrypt(sid, data):
             c2_point = Point(_c2, curve)
             sk_p = sk[attribute.list.index(_p)]
             res += sk_p * c2_point
-        await sio.emit('decrypt', {'res': res.compress(), 'c1': data['c1'], 'c0': data['c0'], 'from': data['from']},
+        await sio.emit('decrypt', {'res': res.compress(), 'c1': data['c1'], 'c0': data['c0'], 'cipher': data['cipher'],
+                                   'from': data['from']},
                        room=sid)
     else:
         await sio.emit('decrypt_fail', {'from': data['from']},
